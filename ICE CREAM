@@ -1,14 +1,4 @@
 /**
- * REGRESION LINEAL SIMPLE - VENTAS DE HELADO
- * Universidad EAFIT - Ingenieria de Sistemas
- * 
- * Este programa implementa una regresion lineal simple para predecir
- * las ventas de helado basandose en la temperatura.
- * 
- * Implementacion completamente desde cero sin usar librerias externas.
- */
-
-/**
  * Clase que implementa el modelo de Regresion Lineal
  * Utiliza el algoritmo de Gradient Descent para entrenar el modelo
  */
