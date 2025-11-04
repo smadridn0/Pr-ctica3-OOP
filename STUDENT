@@ -1,1 +1,778 @@
+/**
+ * Clase que implementa el modelo de Regresion Lineal Multiple
+ * Utiliza el algoritmo de Gradient Descent para entrenar el modelo
+ * Soporta multiples caracteristicas (features)
+ */
+class RegresionLineal {
+    // Atributos del modelo
+    private double[] weights;                  // Coeficientes de la regresion (w1, w2, ..., wn)
+    private double bias;                       // Termino independiente (b)
+    private boolean ajustado;                  // Indica si el modelo ha sido entrenado
+    private double[] mediaEscalador;           // Media de cada caracteristica para normalizacion
+    private double[] desviacionEscalador;      // Desviacion estandar para normalizacion
+    private double tasaAprendizaje;            // Learning rate para gradient descent
+    private int epocas;                        // Numero de iteraciones de entrenamiento
+    private double[] historialCosto;           // Almacena el costo en cada epoca
+    private int tamanioHistorialCosto;         // Contador del historial
+    
+    /**
+     * Constructor del modelo de regresion lineal
+     * @param tasaAprendizaje Velocidad de aprendizaje (alpha)
+     * @param epocas Numero de iteraciones de entrenamiento
+     */
+    public RegresionLineal(double tasaAprendizaje, int epocas) {
+        this.weights = null;
+        this.bias = 0.0;
+        this.ajustado = false;
+        this.mediaEscalador = null;
+        this.desviacionEscalador = null;
+        this.tasaAprendizaje = tasaAprendizaje;
+        this.epocas = epocas;
+        this.historialCosto = new double[epocas / 100 + 1];
+        this.tamanioHistorialCosto = 0;
+    }
+    
+    /**
+     * Calcula la media (promedio) de un arreglo
+     * @param arreglo Arreglo de numeros
+     * @return Valor promedio
+     */
+    private double media(double[] arreglo) {
+        double suma = 0.0;
+        for (int i = 0; i < arreglo.length; i++) suma += arreglo[i];
+        return suma / arreglo.length;
+    }
+    
+    /**
+     * Calcula la desviacion estandar de un arreglo
+     * Formula: sqrt(sum((x - mean)^2) / n)
+     * @param arreglo Arreglo de numeros
+     * @return Desviacion estandar
+     */
+    private double desviacionEstandar(double[] arreglo) {
+        double valorMedia = media(arreglo);
+        double sumaDiferenciasCuadrado = 0.0;
+        for (int i = 0; i < arreglo.length; i++) {
+            double diferencia = arreglo[i] - valorMedia;
+            sumaDiferenciasCuadrado += diferencia * diferencia;
+        }
+        return Math.sqrt(sumaDiferenciasCuadrado / arreglo.length);
+    }
+    
+    /**
+     * Extrae una columna especifica de una matriz
+     * @param matriz Matriz de datos
+     * @param indiceColumna Indice de la columna a extraer
+     * @return Arreglo con los valores de la columna
+     */
+    private double[] obtenerColumna(double[][] matriz, int indiceColumna) {
+        double[] columna = new double[matriz.length];
+        for (int i = 0; i < matriz.length; i++) {
+            columna[i] = matriz[i][indiceColumna];
+        }
+        return columna;
+    }
+    
+    /**
+     * Normaliza los datos usando StandardScaler (z-score)
+     * Formula: (x - media) / desviacion_estandar
+     * Esto ayuda a que el gradient descent converja mas rapido
+     * y evita que features con diferentes escalas dominen el modelo
+     * 
+     * @param X Matriz de caracteristicas
+     * @param ajustarEscalador Si es true, calcula media y desviacion; si es false, usa valores previos
+     * @return Matriz normalizada
+     */
+    public double[][] data_scaling(double[][] X, boolean ajustarEscalador) {
+        int numeroMuestras = X.length;
+        int numeroCaracteristicas = X[0].length;
+        
+        // Si es la primera vez, calcular media y desviacion de cada caracteristica
+        if (ajustarEscalador) {
+            mediaEscalador = new double[numeroCaracteristicas];
+            desviacionEscalador = new double[numeroCaracteristicas];
+            
+            for (int j = 0; j < numeroCaracteristicas; j++) {
+                double[] columna = obtenerColumna(X, j);
+                mediaEscalador[j] = media(columna);
+                desviacionEscalador[j] = desviacionEstandar(columna);
+                // Evitar division por cero si todos los valores son iguales
+                if (desviacionEscalador[j] == 0) desviacionEscalador[j] = 1.0;
+            }
+        }
+        
+        // Validar que el escalador este configurado
+        if (mediaEscalador == null || desviacionEscalador == null) {
+            throw new RuntimeException("Escalador no ajustado");
+        }
+        
+        // Aplicar normalizacion a cada valor
+        double[][] matrizEscalada = new double[numeroMuestras][numeroCaracteristicas];
+        for (int i = 0; i < numeroMuestras; i++) {
+            for (int j = 0; j < numeroCaracteristicas; j++) {
+                matrizEscalada[i][j] = (X[i][j] - mediaEscalador[j]) / desviacionEscalador[j];
+            }
+        }
+        return matrizEscalada;
+    }
+    
+    /**
+     * Entrena el modelo usando Gradient Descent con multiples caracteristicas
+     * Algoritmo:
+     * 1. Calcular predicciones: y_pred = X * w + b
+     * 2. Calcular error: error = y_pred - y_real
+     * 3. Calcular gradientes para cada peso: dw[j] = (1/m) * sum(X[i][j] * error[i])
+     * 4. Calcular gradiente para sesgo: db = (1/m) * sum(error)
+     * 5. Actualizar parametros: w[j] = w[j] - alpha * dw[j], b = b - alpha * db
+     * 6. Repetir por numero de epocas
+     * 
+     * @param XEntrenamiento Matriz de caracteristicas de entrenamiento (m x n)
+     * @param yEntrenamiento Vector de valores objetivo de entrenamiento (m)
+     * @param usarEscalado Si normalizar los datos o no
+     */
+    public void fit(double[][] XEntrenamiento, double[] yEntrenamiento, boolean usarEscalado) {
+        double[][] X = XEntrenamiento;
+        double[] y = yEntrenamiento;
+        
+        // Validar dimensiones
+        if (X.length != y.length) {
+            throw new RuntimeException("X e y deben tener el mismo numero de muestras");
+        }
+        
+        // Normalizar datos si se solicita (recomendado para gradient descent)
+        if (usarEscalado) {
+            X = data_scaling(X, true);
+        }
+        
+        // Inicializar parametros
+        int m = X.length;                  // Numero de muestras
+        int n = X[0].length;               // Numero de caracteristicas
+        weights = new double[n];           // Inicializar pesos en 0
+        bias = 0.0;                        // Inicializar sesgo en 0
+        tamanioHistorialCosto = 0;
+        
+        // Gradient Descent - Bucle principal de entrenamiento
+        for (int epoca = 0; epoca < epocas; epoca++) {
+            // Paso 1: Forward propagation - Calcular predicciones
+            // y_pred = X * w + b = w1*x1 + w2*x2 + ... + wn*xn + b
+            double[] predicciones = new double[m];
+            for (int i = 0; i < m; i++) {
+                predicciones[i] = bias;
+                for (int j = 0; j < n; j++) {
+                    predicciones[i] += X[i][j] * weights[j];
+                }
+            }
+            
+            // Paso 2: Calcular errores
+            // error = y_pred - y_real
+            double[] errores = new double[m];
+            for (int i = 0; i < m; i++) {
+                errores[i] = predicciones[i] - y[i];
+            }
+            
+            // Paso 3: Calcular gradientes para los pesos
+            // dw[j] = (1/m) * sum(X[i][j] * error[i]) para cada caracteristica j
+            double[] dw = new double[n];
+            for (int j = 0; j < n; j++) {
+                double suma = 0.0;
+                for (int i = 0; i < m; i++) {
+                    suma += X[i][j] * errores[i];
+                }
+                dw[j] = suma / m;
+            }
+            
+            // Paso 4: Calcular gradiente para el sesgo
+            // db = (1/m) * sum(error)
+            double db = 0.0;
+            for (int i = 0; i < m; i++) db += errores[i];
+            db = db / m;
+            
+            // Paso 5: Actualizar parametros usando gradient descent
+            // w[j] = w[j] - alpha * dw[j] para cada peso
+            // b = b - alpha * db
+            for (int j = 0; j < n; j++) {
+                weights[j] -= tasaAprendizaje * dw[j];
+            }
+            bias -= tasaAprendizaje * db;
+            
+            // Guardar costo cada 100 epocas para monitoreo
+            if (epoca % 100 == 0) {
+                // Calcular funcion de costo: MSE / 2
+                // Costo = (1/2m) * sum((y_pred - y_real)^2)
+                double costo = 0.0;
+                for (int i = 0; i < m; i++) {
+                    costo += errores[i] * errores[i];
+                }
+                costo = costo / (2 * m);
+                historialCosto[tamanioHistorialCosto++] = costo;
+                
+                // Imprimir progreso cada 1000 epocas
+                if (epoca % 1000 == 0) {
+                    System.out.println("Epoca " + epoca + "/" + epocas + " - Costo: " + formatearDecimal(costo, 4));
+                }
+            }
+        }
+        
+        ajustado = true;
+        System.out.println("\nEntrenamiento completado!");
+        System.out.println("Costo final: " + formatearDecimal(historialCosto[tamanioHistorialCosto - 1], 4));
+    }
+    
+    /**
+     * Realiza predicciones usando el modelo entrenado
+     * Formula: y_pred = X * w + b
+     * 
+     * @param XPrueba Matriz de caracteristicas para predecir
+     * @return Arreglo con las predicciones
+     */
+    public double[] predict(double[][] XPrueba) {
+        if (!ajustado) throw new RuntimeException("El modelo debe ser ajustado primero");
+        
+        // Normalizar datos de prueba usando los parametros del entrenamiento
+        double[][] X = XPrueba;
+        if (mediaEscalador != null) {
+            X = data_scaling(X, false);
+        }
+        
+        // Calcular predicciones
+        double[] predicciones = new double[X.length];
+        for (int i = 0; i < X.length; i++) {
+            predicciones[i] = bias;
+            for (int j = 0; j < weights.length; j++) {
+                predicciones[i] += X[i][j] * weights[j];
+            }
+        }
+        return predicciones;
+    }
+    
+    /**
+     * Calcula el coeficiente de determinacion R^2
+     * R^2 mide que tan bien el modelo explica la varianza en los datos
+     * R^2 = 1 - (SS_res / SS_tot)
+     * 
+     * Interpretacion:
+     * R^2 = 1: Ajuste perfecto
+     * R^2 > 0.8: Excelente ajuste
+     * R^2 > 0.6: Buen ajuste
+     * R^2 < 0.4: Ajuste pobre
+     * 
+     * @param XPrueba Matriz de caracteristicas de prueba
+     * @param yPrueba Vector de valores reales de prueba
+     * @return Valor de R^2
+     */
+    public double score(double[][] XPrueba, double[] yPrueba) {
+        double[] predicciones = predict(XPrueba);
+        
+        // Calcular suma de cuadrados de residuos (SS_res)
+        // SS_res = sum((y_real - y_pred)^2)
+        double ssRes = 0.0;
+        for (int i = 0; i < yPrueba.length; i++) {
+            double residuo = yPrueba[i] - predicciones[i];
+            ssRes += residuo * residuo;
+        }
+        
+        // Calcular suma total de cuadrados (SS_tot)
+        // SS_tot = sum((y_real - y_mean)^2)
+        double yMedia = media(yPrueba);
+        double ssTot = 0.0;
+        for (int i = 0; i < yPrueba.length; i++) {
+            double diferencia = yPrueba[i] - yMedia;
+            ssTot += diferencia * diferencia;
+        }
+        
+        // Calcular R^2
+        return 1.0 - (ssRes / ssTot);
+    }
+    
+    /**
+     * Calcula el Error Cuadratico Medio (ECM o MSE)
+     * ECM = (1/n) * sum((y_real - y_pred)^2)
+     * Mide el promedio de los errores al cuadrado
+     * 
+     * @param XPrueba Matriz de caracteristicas de prueba
+     * @param yPrueba Vector de valores reales de prueba
+     * @return Valor del ECM
+     */
+    public double calcularECM(double[][] XPrueba, double[] yPrueba) {
+        double[] predicciones = predict(XPrueba);
+        double ecm = 0.0;
+        for (int i = 0; i < yPrueba.length; i++) {
+            double error = yPrueba[i] - predicciones[i];
+            ecm += error * error;
+        }
+        return ecm / yPrueba.length;
+    }
+    
+    /**
+     * Calcula la Raiz del Error Cuadratico Medio (RCEM o RMSE)
+     * RCEM = sqrt(ECM)
+     * Mide el error tipico en las mismas unidades que la variable objetivo
+     * 
+     * @param XPrueba Matriz de caracteristicas de prueba
+     * @param yPrueba Vector de valores reales de prueba
+     * @return Valor del RCEM
+     */
+    public double calcularRCEM(double[][] XPrueba, double[] yPrueba) {
+        return Math.sqrt(calcularECM(XPrueba, yPrueba));
+    }
+    
+    /**
+     * Calcula el Error Absoluto Medio (EAM o MAE)
+     * EAM = (1/n) * sum(|y_real - y_pred|)
+     * Mide el promedio de los errores absolutos
+     * Es menos sensible a outliers que el ECM
+     * 
+     * @param XPrueba Matriz de caracteristicas de prueba
+     * @param yPrueba Vector de valores reales de prueba
+     * @return Valor del EAM
+     */
+    public double calcularEAM(double[][] XPrueba, double[] yPrueba) {
+        double[] predicciones = predict(XPrueba);
+        double eam = 0.0;
+        for (int i = 0; i < yPrueba.length; i++) {
+            eam += Math.abs(yPrueba[i] - predicciones[i]);
+        }
+        return eam / yPrueba.length;
+    }
+    
+    /**
+     * Obtiene una copia de los pesos del modelo
+     * @return Arreglo con los pesos
+     */
+    public double[] getWeights() {
+        if (!ajustado) throw new RuntimeException("Modelo no ajustado");
+        double[] copia = new double[weights.length];
+        for (int i = 0; i < weights.length; i++) copia[i] = weights[i];
+        return copia;
+    }
+    
+    /**
+     * Obtiene el sesgo del modelo
+     * @return Valor del sesgo
+     */
+    public double getBias() {
+        if (!ajustado) throw new RuntimeException("Modelo no ajustado");
+        return bias;
+    }
+    
+    /**
+     * Formatea un numero decimal con precision especifica
+     * @param valor Numero a formatear
+     * @param decimales Numero de decimales
+     * @return Cadena formateada
+     */
+    private String formatearDecimal(double valor, int decimales) {
+        long multiplicador = 1;
+        for (int i = 0; i < decimales; i++) multiplicador *= 10;
+        long redondeado = (long)(valor * multiplicador + 0.5);
+        long parteEntera = redondeado / multiplicador;
+        long parteDecimal = redondeado % multiplicador;
+        String cadenaDecimal = "" + parteDecimal;
+        while (cadenaDecimal.length() < decimales) cadenaDecimal = "0" + cadenaDecimal;
+        return parteEntera + "." + cadenaDecimal;
+    }
+}
 
+/**
+ * Clase auxiliar para almacenar el resultado de la division
+ * de datos en conjuntos de entrenamiento y prueba
+ */
+class DivisionEntrenamientoPrueba {
+    double[][] XEntrenamiento;
+    double[][] XPrueba;
+    double[] yEntrenamiento;
+    double[] yPrueba;
+}
+
+/**
+ * Generador de numeros pseudo-aleatorios simple
+ * Usa el algoritmo Linear Congruential Generator (LCG)
+ * Permite reproducibilidad usando una semilla fija
+ */
+class AleatorioSimple {
+    private long semilla;
+    
+    public AleatorioSimple(long semilla) {
+        this.semilla = semilla;
+    }
+    
+    /**
+     * Genera el siguiente numero aleatorio
+     * @param n Limite superior (exclusivo)
+     * @return Numero aleatorio entre 0 y n-1
+     */
+    public int siguienteEntero(int n) {
+        semilla = (semilla * 9301 + 49297) % 233280;
+        return (int)((semilla / 233280.0) * n);
+    }
+}
+
+/**
+ * Clase principal que ejecuta el analisis de regresion multiple
+ * para predecir calificaciones de examenes basandose en multiples factores
+ */
+public class Main {
+    
+    /**
+     * Repite una cadena un numero determinado de veces
+     * Util para crear separadores visuales
+     * @param cadena Cadena a repetir
+     * @param veces Numero de repeticiones
+     * @return Cadena repetida
+     */
+    private static String repetir(String cadena, int veces) {
+        String resultado = "";
+        for (int i = 0; i < veces; i++) resultado += cadena;
+        return resultado;
+    }
+    
+    /**
+     * Formatea un numero decimal
+     * @param valor Numero a formatear
+     * @param decimales Numero de decimales
+     * @return Cadena formateada
+     */
+    private static String formatearDecimal(double valor, int decimales) {
+        long multiplicador = 1;
+        for (int i = 0; i < decimales; i++) multiplicador *= 10;
+        long redondeado = (long)(valor * multiplicador + 0.5);
+        long parteEntera = redondeado / multiplicador;
+        long parteDecimal = redondeado % multiplicador;
+        String cadenaDecimal = "" + parteDecimal;
+        while (cadenaDecimal.length() < decimales) cadenaDecimal = "0" + cadenaDecimal;
+        return parteEntera + "." + cadenaDecimal;
+    }
+    
+    /**
+     * Divide los datos en conjuntos de entrenamiento y prueba
+     * Implementa shuffle aleatorio usando el algoritmo de Fisher-Yates
+     * para evitar sesgos en la seleccion
+     * 
+     * @param X Caracteristicas (matriz m x n)
+     * @param y Valores objetivo (vector m)
+     * @param tamanoPrueba Proporcion de datos para prueba (0.0 a 1.0)
+     * @param semilla Semilla para reproducibilidad
+     * @return Objeto con los datos divididos
+     */
+    private static DivisionEntrenamientoPrueba dividirEntrenamientoPrueba(double[][] X, double[] y, double tamanoPrueba, long semilla) {
+        AleatorioSimple aleatorio = new AleatorioSimple(semilla);
+        int n = X.length;
+        
+        // Crear arreglo de indices [0, 1, 2, ..., n-1]
+        int[] indices = new int[n];
+        for (int i = 0; i < n; i++) indices[i] = i;
+        
+        // Algoritmo de Fisher-Yates para mezclar indices aleatoriamente
+        // Esto asegura que la division sea aleatoria y sin sesgos
+        for (int i = n - 1; i > 0; i--) {
+            int j = aleatorio.siguienteEntero(i + 1);
+            int temp = indices[i];
+            indices[i] = indices[j];
+            indices[j] = temp;
+        }
+        
+        // Calcular tamanos de conjuntos
+        int muestrasPrueba = (int) (n * tamanoPrueba);
+        int muestrasEntrenamiento = n - muestrasPrueba;
+        
+        // Crear estructuras de datos
+        DivisionEntrenamientoPrueba resultado = new DivisionEntrenamientoPrueba();
+        resultado.XEntrenamiento = new double[muestrasEntrenamiento][X[0].length];
+        resultado.XPrueba = new double[muestrasPrueba][X[0].length];
+        resultado.yEntrenamiento = new double[muestrasEntrenamiento];
+        resultado.yPrueba = new double[muestrasPrueba];
+        
+        // Llenar conjunto de prueba (primeros indices mezclados)
+        for (int i = 0; i < muestrasPrueba; i++) {
+            for (int j = 0; j < X[0].length; j++) {
+                resultado.XPrueba[i][j] = X[indices[i]][j];
+            }
+            resultado.yPrueba[i] = y[indices[i]];
+        }
+        
+        // Llenar conjunto de entrenamiento (indices restantes)
+        for (int i = 0; i < muestrasEntrenamiento; i++) {
+            for (int j = 0; j < X[0].length; j++) {
+                resultado.XEntrenamiento[i][j] = X[indices[muestrasPrueba + i]][j];
+            }
+            resultado.yEntrenamiento[i] = y[indices[muestrasPrueba + i]];
+        }
+        
+        return resultado;
+    }
+    
+    /**
+     * Convierte un arreglo de doubles a cadena formateada
+     * @param arreglo Arreglo a convertir
+     * @return Cadena formateada como [a, b, c]
+     */
+    private static String arregloACadena(double[] arreglo) {
+        String resultado = "[";
+        for (int i = 0; i < arreglo.length; i++) {
+            resultado += formatearDecimal(arreglo[i], 4);
+            if (i < arreglo.length - 1) resultado += ", ";
+        }
+        resultado += "]";
+        return resultado;
+    }
+    
+    /**
+     * Calcula la media de un arreglo
+     * @param arreglo Arreglo de numeros
+     * @return Valor promedio
+     */
+    private static double media(double[] arreglo) {
+        double suma = 0.0;
+        for (int i = 0; i < arreglo.length; i++) suma += arreglo[i];
+        return suma / arreglo.length;
+    }
+    
+    /**
+     * Metodo principal - Ejecuta el analisis de regresion multiple completo
+     */
+    public static void main(String[] args) {
+        // Encabezado
+        System.out.println(repetir("=", 70));
+        System.out.println("REGRESION LINEAL MULTIPLE - CALIFICACIONES DE EXAMENES");
+        System.out.println("Universidad EAFIT - Implementacion Java POO");
+        System.out.println("Conjunto de datos: 200 estudiantes");
+        System.out.println(repetir("=", 70));
+        System.out.println();
+        
+        // Datos del dataset: 200 estudiantes
+        // Cada fila contiene: [horas_estudiadas, horas_sueno, porcentaje_asistencia, calificaciones_previas, calificacion_examen]
+        // Las primeras 4 columnas son caracteristicas (X)
+        // La ultima columna es el objetivo (y)
+        double[][] datos = {
+            {8,8.8,72.1,45,30.2}, {1.3,8.6,60.7,55,25}, {4,8.2,73.7,86,35.8},
+            {3.5,4.8,95.1,66,34}, {9.1,6.4,89.8,71,40.3}, {8.4,5.1,58.5,75,35.7},
+            {10.8,6,54.2,88,37.9}, {2,4.3,75.8,55,18.3}, {5.6,5.9,81.6,84,34.7},
+            {1.3,8.9,66.8,70,24.7}, {3.4,5.3,90.9,81,29.3}, {6.6,7.9,87.6,85,35.1},
+            {1.3,6.3,83.6,71,31.2}, {3.2,6.1,61.2,68,30.2}, {8.1,8.8,60,90,41.1},
+            {7,9,51.2,41,34.1}, {3.4,6.8,62.2,45,28.9}, {7.5,7.6,73.8,58,36.3},
+            {9.9,4.8,92.5,54,35.6}, {1.1,5.5,53.6,65,17.1}, {9.9,8.8,70.7,84,46},
+            {8.7,6.9,81.5,55,36.1}, {4.7,6.7,59.7,59,29.6}, {2.7,7.7,84.8,82,35.9},
+            {11.5,4.3,74.7,77,39.2}, {4.7,6.9,62.2,63,30}, {2,6.5,82.8,70,29},
+            {2.1,8.3,50.3,75,26.5}, {10.3,4.8,87.5,73,37.2}, {7.6,8.8,88.5,62,36.2},
+            {9.9,4.4,55.3,67,34.5}, {9,4.9,71.3,87,41.6}, {6.9,7,58.8,75,38.1},
+            {11.7,7.4,97.9,61,42.7}, {5.2,5.2,75.9,62,32}, {7.1,4.6,52.5,84,32},
+            {10.1,8.5,62.5,69,44.7}, {7.8,5.2,92.4,57,38.3}, {10.5,7,72.8,59,39.8},
+            {7.4,7.1,90.1,56,35}, {8.8,6.1,83.4,54,34.2}, {1.5,6.9,99.4,47,23.1},
+            {3.5,6.6,79.8,86,37.2}, {4.2,8.7,97.5,52,30.3}, {1.9,5,94.6,60,26.1},
+            {3.6,7.6,80.6,47,31.8}, {2.1,5.2,86,87,31.6}, {4.1,6,75.2,74,31.1},
+            {8,7.4,91.5,88,41.2}, {5,5.5,77.4,84,30.6}, {5.1,5.6,94.9,51,28.8},
+            {3.3,7.8,87.2,52,30.7}, {3.9,4.4,73.7,53,26.9}, {11.3,6.3,63,87,46.4},
+            {8.1,9,62.4,70,34.4}, {7.7,9,81.9,57,37}, {2.9,4.4,88.3,86,35.2},
+            {9,5.1,76.1,77,38.2}, {2.8,5.3,81.3,88,33}, {5.2,8.7,63.7,73,29.2},
+            {11.9,8.4,53.9,78,48.6}, {8,8.4,64.3,58,36.1}, {7.1,5.8,63.6,46,27.1},
+            {8.5,4.8,66,93,36.1}, {10.3,8.2,77,52,39.5}, {9.5,7.5,56.9,58,36.7},
+            {3.5,7.1,61.6,54,21.7}, {1.4,8.9,84.7,63,32.2}, {4.5,7.3,85.3,51,33.5},
+            {3.9,4,53.2,59,23.9}, {3.3,8.1,70.4,40,20.8}, {11.4,5.5,77.1,85,47.9},
+            {10.6,7.3,70.8,74,41.9}, {4.5,8.7,60.3,48,29.5}, {8.2,4.7,71,57,33.5},
+            {5.4,4.6,95.2,42,26.3}, {11.1,4.5,79.2,43,39.9}, {6,6.8,84.8,75,40.3},
+            {3.9,5.4,92.8,58,26.5}, {3.7,7,88.3,84,34.2}, {7.2,7.6,69,48,30.8},
+            {3.9,5,50.3,80,32.4}, {7.4,7.2,67.6,95,39.8}, {10.9,5.3,87.7,88,48.9},
+            {5.4,6.4,92.7,71,38}, {3.4,8.5,97.7,46,26.5}, {12,8.2,71,95,51.3},
+            {6.6,4.5,87.4,40,28.6}, {2,6.1,77.3,76,32.1}, {1.5,5.4,80.2,58,23.9},
+            {2.2,4,61,70,27.3}, {7.9,7.9,61,70,34}, {9.7,7.2,71.8,68,37.5},
+            {5.6,5.3,51.5,61,29.1}, {1.7,7.7,66.8,51,28.1}, {5.2,6.8,84,43,28.7},
+            {12,6.1,70.2,56,36.9}, {6.8,4,58.3,95,36}, {11.7,4.4,73.4,70,39.9},
+            {10.5,8.4,56.4,47,37.1}, {1.1,8.5,81.1,92,31.4}, {8.9,6.7,51.3,44,31.3},
+            {8.5,8.2,69.7,65,35.7}, {6.9,6.9,78.2,71,32.6}, {3.9,4.7,51.4,44,24.1},
+            {8.1,4.6,82.1,76,38.2}, {2.2,5.5,56.8,80,23.7}, {5.8,8.5,73.1,83,39.2},
+            {6,8,52.5,43,23.2}, {11.5,8.3,69,49,42.2}, {10.6,8.5,60.6,49,39.6},
+            {3.9,5.1,66.3,91,34.8}, {6.5,5.2,88.1,76,34.6}, {3,4.5,69,59,26.4},
+            {11,7.9,87.6,45,43.1}, {10.6,8.4,91.6,55,46.4}, {4.3,6,62.6,47,25.2},
+            {8,7.1,54.1,75,31.3}, {7.7,4.8,51,88,35.8}, {2.7,8.6,77,66,29.8},
+            {9.4,8.3,100,78,47.9}, {6.9,8.9,67.5,78,40.9}, {9.6,8.1,82.5,90,44.1},
+            {6.8,8.4,89.1,79,39.3}, {1,4.1,82.6,54,21.2}, {4.6,7.7,87.7,89,38.6},
+            {1.2,5.7,97.5,73,26.8}, {11.2,8.7,60,64,42.7}, {10.7,8,51,68,36.1},
+            {10.1,8.3,57.6,68,39.2}, {4.4,8.1,56.3,59,32.9}, {1.6,5.3,83.5,95,28.8},
+            {10.7,7.9,78.2,77,45.7}, {11.4,4.5,60.9,67,40.8}, {1.9,8.4,85,59,30.6},
+            {6.3,8.3,88.3,76,41.1}, {1.8,5.1,58.4,79,29}, {9.4,8.1,80.4,43,35.1},
+            {9.4,6.3,87.4,79,39.9}, {2.4,5.5,55.7,87,29.9}, {6.2,8,91,46,35},
+            {7,5.1,98.2,88,43.3}, {3.9,4.1,55.4,53,19}, {10.6,5,51.3,80,35.1},
+            {5.7,5.6,65.6,53,29.9}, {3.3,8.3,83.9,56,33}, {6.9,8.8,97.9,82,45.8},
+            {9,5.4,69.8,45,35.5}, {3.2,7.2,85.8,50,26.4}, {4.4,6,53.8,55,21.9},
+            {11.9,8.9,84.5,51,44.1}, {8.1,6.7,81.4,75,42.3}, {5.8,8.7,55.1,44,27.7},
+            {6.7,4.6,88.6,50,33.4}, {2.3,8.9,92.5,40,29.7}, {3.5,4.9,80,66,23.6},
+            {4.7,8.8,56.1,68,33.6}, {7.5,5.3,99.2,84,37.9}, {3.5,4.5,89.1,78,29.5},
+            {3.4,6.2,67.4,70,24.7}, {1.8,7.6,71.4,58,25.2}, {7.9,5.6,68.5,42,31.4},
+            {3.5,7,75.3,54,30}, {11,6.6,67.1,58,35.8}, {10.5,5.9,92.5,85,40.6},
+            {1.8,6.9,91.1,58,30.1}, {3.6,5.3,55.3,84,30.3}, {8.4,7.5,98,95,42},
+            {3.4,4,81.8,69,32.1}, {2.5,8.6,91.4,44,22.8}, {11.3,6.7,85.4,83,45.3},
+            {7.3,7.6,71.8,54,31}, {6.2,7.7,86.7,56,31}, {9.6,7.4,98.3,90,40.9},
+            {9.9,5.8,63.5,90,44.8}, {3.1,4.3,90.4,80,34.4}, {2.1,7.3,76.9,77,30.7},
+            {5.7,5.7,74.2,82,31}, {5.7,5.6,71.8,91,35}, {6.1,8.2,86.6,52,31.4},
+            {9,7.6,63.4,67,38.4}, {8.4,5.5,92.6,47,36.1}, {11.8,5.5,91.5,74,44.1},
+            {2.1,6,54.3,54,19.4}, {5.4,6,94.1,81,39.4}, {4.7,5.5,62.2,49,22.9},
+            {10.5,4.6,73.2,57,36.2}, {3.7,6.1,80.5,92,33.4}, {3.1,8.7,68.9,49,23.4},
+            {5.9,7.4,51.4,44,28}, {5.6,8.5,92.5,43,32.2}, {4.1,7.1,59.1,50,30.7},
+            {3.7,5.5,60.6,90,28.8}, {11.2,6.7,89.9,59,46.7}, {5.9,4,67,78,33.8},
+            {10.5,5.4,94,87,42.7}, {7.1,6.1,85.1,92,40.4}, {1.6,6.9,63.8,76,28.2},
+            {12,7.3,50.5,58,42}, {10.2,6.3,97.4,68,37.8}
+        };
+        
+        // Nombres de las caracteristicas
+        String[] nombresCaracteristicas = {"horas_estudiadas", "horas_sueno", "porcentaje_asistencia", "calificaciones_previas"};
+        int numeroMuestras = datos.length;
+        int numeroCaracteristicas = 4;
+        
+        // Separar caracteristicas (X) y objetivo (y)
+        double[][] X = new double[numeroMuestras][numeroCaracteristicas];
+        double[] y = new double[numeroMuestras];
+        
+        for (int i = 0; i < numeroMuestras; i++) {
+            // Copiar las primeras 4 columnas a X (caracteristicas)
+            for (int j = 0; j < numeroCaracteristicas; j++) {
+                X[i][j] = datos[i][j];
+            }
+            // Copiar la ultima columna a y (objetivo)
+            y[i] = datos[i][4];
+        }
+        
+        // Paso 1: Cargar datos
+        System.out.println("Cargando datos...");
+        System.out.println("   Forma del conjunto de datos: " + numeroMuestras + " muestras, " + numeroCaracteristicas + " caracteristicas");
+        System.out.println("   Caracteristicas: horas_estudiadas, horas_sueno, porcentaje_asistencia, calificaciones_previas");
+        System.out.println("   Objetivo: calificacion_examen");
+        System.out.println();
+        
+        // Calcular estadisticas del objetivo
+        double yMedia = media(y);
+        double yMinimo = y[0];
+        double yMaximo = y[0];
+        for (int i = 0; i < y.length; i++) {
+            if (y[i] < yMinimo) yMinimo = y[i];
+            if (y[i] > yMaximo) yMaximo = y[i];
+        }
+        
+        System.out.println("Estadisticas del conjunto de datos:");
+        System.out.println("   Media del objetivo: " + formatearDecimal(yMedia, 2));
+        System.out.println("   Rango del objetivo: [" + formatearDecimal(yMinimo, 2) + ", " + formatearDecimal(yMaximo, 2) + "]");
+        System.out.println();
+        
+        // Paso 2: Dividir datos en entrenamiento (80%) y prueba (20%)
+        System.out.println("Dividiendo datos (80% entrenamiento, 20% prueba)...");
+        DivisionEntrenamientoPrueba division = dividirEntrenamientoPrueba(X, y, 0.2, 42);
+        System.out.println("   Conjunto de entrenamiento: " + division.XEntrenamiento.length + " muestras");
+        System.out.println("   Conjunto de prueba: " + division.XPrueba.length + " muestras");
+        System.out.println();
+        
+        // Paso 3: Crear modelo de regresion lineal multiple
+        // Parametros: learning_rate=0.01, epochs=10000
+        // Learning rate mas bajo que regresion simple porque hay mas caracteristicas
+        System.out.println("Creando modelo de Regresion Lineal Multiple...");
+        RegresionLineal mlr = new RegresionLineal(0.01, 10000);
+        System.out.println();
+        
+        // Paso 4: Entrenar el modelo
+        System.out.println("Entrenando modelo...");
+        mlr.fit(division.XEntrenamiento, division.yEntrenamiento, true);
+        System.out.println();
+        
+        // Paso 5: Mostrar parametros aprendidos
+        System.out.println(repetir("=", 70));
+        System.out.println("PARAMETROS DEL MODELO");
+        System.out.println(repetir("=", 70));
+        double[] pesos = mlr.getWeights();
+        System.out.println("weights: " + arregloACadena(pesos));
+        System.out.println("bias: " + formatearDecimal(mlr.getBias(), 4));
+        System.out.println();
+        
+        // Mostrar coeficientes individuales
+        System.out.println("Coeficientes de caracteristicas:");
+        for (int i = 0; i < nombresCaracteristicas.length; i++) {
+            System.out.println("   " + nombresCaracteristicas[i] + ": " + formatearDecimal(pesos[i], 4));
+        }
+        System.out.println();
+        
+        // Paso 6: Realizar predicciones
+        System.out.println(repetir("=", 70));
+        System.out.println("PREDICCIONES");
+        System.out.println(repetir("=", 70));
+        double[] yPredicha = mlr.predict(division.XPrueba);
+        
+        // Mostrar algunas predicciones de ejemplo
+        System.out.println("\nPredicciones de muestra (primeras 10):");
+        System.out.println("    Real   |  Prediccion |    Error");
+        System.out.println(repetir("-", 40));
+        int numeroMostrar = division.XPrueba.length < 10 ? division.XPrueba.length : 10;
+        for (int i = 0; i < numeroMostrar; i++) {
+            double real = division.yPrueba[i];
+            double prediccion = yPredicha[i];
+            double error = Math.abs(real - prediccion);
+            System.out.println("     " + formatearDecimal(real, 2) + "   |      " + 
+                             formatearDecimal(prediccion, 2) + "   |      " + formatearDecimal(error, 2));
+        }
+        System.out.println();
+        
+        // Paso 7: Evaluar el modelo con multiples metricas
+        System.out.println(repetir("=", 70));
+        System.out.println("EVALUACION DEL MODELO");
+        System.out.println(repetir("=", 70));
+        double puntuacionR2 = mlr.score(division.XPrueba, division.yPrueba);
+        double ecm = mlr.calcularECM(division.XPrueba, division.yPrueba);
+        double rcem = mlr.calcularRCEM(division.XPrueba, division.yPrueba);
+        double eam = mlr.calcularEAM(division.XPrueba, division.yPrueba);
+        
+        System.out.println("score (R cuadrado): " + formatearDecimal(puntuacionR2, 4));
+        System.out.println("ECM: " + formatearDecimal(ecm, 4));
+        System.out.println("RCEM: " + formatearDecimal(rcem, 4));
+        System.out.println("EAM: " + formatearDecimal(eam, 4));
+        System.out.println();
+        
+        // Paso 8: Interpretar resultados
+        System.out.println(repetir("=", 70));
+        System.out.println("INTERPRETACION");
+        System.out.println(repetir("=", 70));
+        
+        if (puntuacionR2 > 0.8) {
+            System.out.println("Ajuste excelente!");
+        } else if (puntuacionR2 > 0.6) {
+            System.out.println("Buen ajuste.");
+        } else {
+            System.out.println("Ajuste moderado.");
+        }
+        System.out.println();
+        
+        // Analisis de importancia de caracteristicas
+        // Ordena las caracteristicas por magnitud absoluta de sus pesos
+        System.out.println("Analisis de importancia de caracteristicas:");
+        System.out.println("\nCaracteristicas clasificadas por importancia:");
+        
+        // Crear arreglo de indices para ordenar
+        int[] indices = new int[pesos.length];
+        for (int i = 0; i < pesos.length; i++) indices[i] = i;
+        
+        // Ordenar por magnitud absoluta de pesos (bubble sort simple)
+        for (int i = 0; i < pesos.length - 1; i++) {
+            for (int j = i + 1; j < pesos.length; j++) {
+                if (Math.abs(pesos[indices[j]]) > Math.abs(pesos[indices[i]])) {
+                    int temp = indices[i];
+                    indices[i] = indices[j];
+                    indices[j] = temp;
+                }
+            }
+        }
+        
+        // Mostrar caracteristicas ordenadas por importancia
+        for (int i = 0; i < indices.length; i++) {
+            int idx = indices[i];
+            String impacto = pesos[idx] > 0 ? "impacto positivo" : "impacto negativo";
+            System.out.println("   " + (i + 1) + ". " + nombresCaracteristicas[idx] + 
+                             " (peso: " + formatearDecimal(pesos[idx], 4) + ", " + impacto + ")");
+        }
+        System.out.println();
+        
+        // Calcular error promedio como porcentaje de la media
+        double errorMedioPorcentaje = (eam / yMedia) * 100;
+        System.out.println("Error de prediccion promedio: " + formatearDecimal(errorMedioPorcentaje, 2) + "% de la calificacion media");
+        System.out.println();
+        
+        // Pie de pagina
+        System.out.println(repetir("=", 70));
+        System.out.println("ANALISIS COMPLETO - 200 ESTUDIANTES");
+        System.out.println(repetir("=", 70));
+    }
+}
