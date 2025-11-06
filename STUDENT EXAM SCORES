@@ -122,7 +122,7 @@ class RegresionLineal {
      * 1. Calcular predicciones: y_pred = X * w + b
      * 2. Calcular error: error = y_pred - y_real
      * 3. Calcular gradientes para cada peso: dw[j] = (1/m) * sum(X[i][j] * error[i])
-     * 4. Calcular gradiente para sesgo: db = (1/m) * sum(error)
+     * 4. Calcular gradiente para bias: db = (1/m) * sum(error)
      * 5. Actualizar parametros: w[j] = w[j] - alpha * dw[j], b = b - alpha * db
      * 6. Repetir por numero de epocas
      * 
@@ -181,7 +181,7 @@ class RegresionLineal {
                 dw[j] = suma / m;
             }
             
-            // Paso 4: Calcular gradiente para el sesgo
+            // Paso 4: Calcular gradiente para el bias
             // db = (1/m) * sum(error)
             double db = 0.0;
             for (int i = 0; i < m; i++) db += errores[i];
