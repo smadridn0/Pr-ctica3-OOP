@@ -770,9 +770,6 @@ public class Main {
         System.out.println("Error de prediccion promedio: " + formatearDecimal(errorMedioPorcentaje, 2) + "% de la calificacion media");
         System.out.println();
         
-        // Pie de pagina
-        System.out.println(repetir("=", 70));
-        System.out.println("ANALISIS COMPLETO - 200 ESTUDIANTES");
-        System.out.println(repetir("=", 70));
+       
     }
 }
