@@ -221,7 +221,7 @@ Las pruebas también se hicieron en jdoodle, y los resultados esta vez fueron co
 
 ======================================================================
 REGRESION LINEAL MULTIPLE - CALIFICACIONES DE EXAMENES
-Universidad EAFIT - Implementacion Java POO
+ - Implementacion Java POO
 Conjunto de datos: 200 estudiantes
 ======================================================================
 
