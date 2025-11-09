@@ -464,7 +464,7 @@ public class Main {
         // Encabezado
         System.out.println(repetir("=", 70));
         System.out.println("REGRESION LINEAL SIMPLE - VENTAS DE HELADO");
-        System.out.println("Universidad EAFIT - Implementacion Java POO");
+        System.out.println("Implementacion Java POO");
         System.out.println(repetir("=", 70));
         System.out.println();
         
