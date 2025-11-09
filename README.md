@@ -1,4 +1,4 @@
-# Regrecion lineal multiple
+# Regresión lineal múltiple
 El objetivo de nuestros códigos es hacer un modelo de regresión lineal simple que prediga, con el primer código, las ventas de helado según la temperatura de este, y con el segundo código, la calificación de cada estudiante según una variedad de factores dados. En ambos casos se usó el método de gradiente descendiente explicado en clase.
 Debido a que ambos códigos tienen propósitos relativamente similares, ambos son bastante parecidos(además por razones que se elaboraran en la sección de errores y problemas).
 Como se nos dio la elección de hacer el codigo en c++ o en java, se escogió java, pues consideramos que la clase de pensamiento computacional del semestre pasado nos dio unas bases bastante buenas para llevar a cabo esta practica.
@@ -313,7 +313,7 @@ Error de prediccion promedio: 7.52% de la calificacion media
 ANALISIS COMPLETO - 200 ESTUDIANTES
 ======================================================================
 
-## errores y problemas
+## Errores y problemas
 En primer lugar, cuando intentamos hacer el programa después de la primera clase, al intentar basarnos en pseudocodigo suministrado, había múltiples términos que no conocíamos, pues en un principio se había explicado el método de recession lineal por matrices, y no por gradiente descendiente. Debido a esto, gran parte de nuestro código proviene de nuestra investigación individual sobre el tema, antes de que fuera explicada en clase.
 
 Otro problema grave que experimentamos proviene del segundo código, que en un principio  fue hecho por separado del primero; sin embargo, al haberlo terminado, este no funcionó, y presentó errores que no supimos reparar; debido a esto, decidimos reutilizar en gran parte el código del primero, que funcionaba bajo los mismos principios, y que requería ajustes mínimos para funcionar con regresión lineal múltiple; no obstante, decidimos dejar los métodos de métricas de error adicionales, que en un principio se habían puesto en nuestra consulta inicial tomadas de este vídeo: https://www.youtube.com/watch?v=M0VgMg7jpRM, y la consulta adicional que hicimos al respecto.
@@ -321,6 +321,6 @@ Otro problema grave que experimentamos proviene del segundo código, que en un p
 
 Finalmente, y como se puede notar en varias secciones del código, tuvimos muchos problemas con la ortografía del código; por ejemplo accidentalmente escribiendo “repeatir” en vez de repetir en varias(muchas) partes del código, lo cual nos produjo un error; o al escribir “tamanio” en tamanioHistorialCosto, el cual se soluciona no corrigiendo el error de deletreo, sino escribiendo “tamanio” en el resto del código.
 
-## concluciones:
+## Conclusiones:
 De este trabajo podemos obtener multiples concluciones. Para empezar, debido a la limitacion de no poder usar librerias, y del hecho de que gran parte de los conocimientos los adquirimos por cuenta propia, pudimos aprender sobre como funciona la regreción lineal, el algoridmo para obtener valores aleatorios, y, de forma adicional, el como imprimir información de forma mas elegante, como se ve en el resultado final del codigo.
 También pudímos ver como funciona la programación orientada a objetos, de como se puede dividir el codigo en diferentes clases, cada una que se encargue de sus respectivas cosas. Y que si bien no es tan "extraña" como la programacion funcional o la logica, igual sirve requiere una manera particular de entender los problemas.
