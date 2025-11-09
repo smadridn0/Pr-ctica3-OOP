@@ -220,8 +220,7 @@ Las predicciones de nuestro modelo se podrían considerar como pobres; sin embar
 Las pruebas también se hicieron en jdoodle, y los resultados esta vez fueron considerablemente más positivos.
 
 ======================================================================
-REGRESION LINEAL MULTIPLE - CALIFICACIONES DE EXAMENES
- - Implementacion Java POO
+REGRESION LINEAL MULTIPLE - CALIFICACIONES DE EXAMENES - Implementacion Java POO
 Conjunto de datos: 200 estudiantes
 ======================================================================
 
