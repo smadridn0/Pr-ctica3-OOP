@@ -145,8 +145,7 @@ convierte vector a representación textual con formatearDecimal.
 ### Primer codigo:
 Las pruebas se hicieron online a traves de jdoodle. Tras entrenar el programa con el 80% de los datos, y hacer el test con el 20%,  devolvió lo siguiente:
 ======================================================================
-REGRESION LINEAL SIMPLE - VENTAS DE HELADO
-Universidad EAFIT - Implementacion Java POO
+REGRESION LINEAL SIMPLE - VENTAS DE HELADO - Implementacion Java POO
 ======================================================================
 
 Cargando datos...
