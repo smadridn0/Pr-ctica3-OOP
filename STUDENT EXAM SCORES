@@ -534,7 +534,7 @@ public class Main {
         // Encabezado
         System.out.println(repetir("=", 70));
         System.out.println("REGRESION LINEAL MULTIPLE - CALIFICACIONES DE EXAMENES");
-        System.out.println("Universidad EAFIT - Implementacion Java POO");
+        System.out.println("Implementacion Java POO");
         System.out.println("Conjunto de datos: 200 estudiantes");
         System.out.println(repetir("=", 70));
         System.out.println();
